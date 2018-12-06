@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "StaticSiteQuickstart": {
+      "commandName": "Project",
+      "commandLineArgs": "init"
+    }
+  }
+}
