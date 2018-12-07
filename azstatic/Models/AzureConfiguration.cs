@@ -5,7 +5,7 @@ using System.IO;
 
 namespace StaticSiteQuickstart.Models
 {
-    public static class SiteConfiguration
+    public static class AzureConfiguration
     {
         public class Configuration
         {
@@ -14,7 +14,7 @@ namespace StaticSiteQuickstart.Models
             public string StorageAccount { get; set; }
         }
 
-        private static readonly string filename = "siteConfiguration.json";
+        private static readonly string filename = "azure.json";
         
 
         public static Configuration GetFromFile()

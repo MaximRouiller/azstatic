@@ -15,7 +15,7 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using static StaticSiteQuickstart.Models.SiteConfiguration;
+using static StaticSiteQuickstart.Models.AzureConfiguration;
 
 namespace StaticSiteQuickstart
 {
@@ -48,7 +48,7 @@ namespace StaticSiteQuickstart
 
 
                 // select subscription
-                Configuration config = SiteConfiguration.GetFromFile();
+                Configuration config = AzureConfiguration.GetFromFile();
                 if (string.IsNullOrWhiteSpace(config.SubscriptionId))
                 {
                     Subscription subscription = await SelectSubcriptionAsync(client);
@@ -58,7 +58,7 @@ namespace StaticSiteQuickstart
                 }
 
                 // select resource group
-                config = SiteConfiguration.GetFromFile();
+                config = AzureConfiguration.GetFromFile();
                 if (string.IsNullOrWhiteSpace(config.ResourceGroup))
                 {
                     //todo: allow to specify RG name
@@ -68,7 +68,7 @@ namespace StaticSiteQuickstart
                 }
 
                 // select storage account name
-                config = SiteConfiguration.GetFromFile();
+                config = AzureConfiguration.GetFromFile();
                 if (string.IsNullOrWhiteSpace(config.StorageAccount))
                 {
 
@@ -97,8 +97,10 @@ namespace StaticSiteQuickstart
             string requestContent = await result.RequestMessage.Content.ReadAsStringAsync();
             HttpRequestMessage request = result.RequestMessage;
             string content = await result.Content.ReadAsStringAsync();
-            //if (result.IsSuccessStatusCode)
-            //    SiteConfiguration.SetDefaultResourceGroup(rgName);
+            if (result.IsSuccessStatusCode)
+            {
+                //SiteConfiguration.SetDefaultResourceGroup(rgName);
+            }
         }
 
         public static string RandomString(int length)
@@ -120,7 +122,7 @@ namespace StaticSiteQuickstart
 
             List<Subscription> activeSubscription = subscriptions.value.Where(x => x.state == "Enabled").ToList();
             Subscription selectedSubscription = CliPicker.SelectFromList(activeSubscription, x => $"{x.displayName} ({x.subscriptionId})");
-            //SiteConfiguration.SetDefaultSubscription(selectedSubscription);
+            AzureConfiguration.SetDefaultSubscription(selectedSubscription);
             return selectedSubscription;
         }
 
