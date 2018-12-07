@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore;
+﻿using azstatic.ConsoleComponents;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -11,10 +12,8 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Formatting;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using static StaticSiteQuickstart.Models.SiteConfiguration;
 
@@ -41,7 +40,7 @@ namespace StaticSiteQuickstart
             {
                 string rawToken = File.ReadAllText(".token");
                 Token token = JsonConvert.DeserializeObject<Token>(rawToken);
-                
+
                 HttpClient client = new HttpClient();
                 client.BaseAddress = new Uri("https://management.azure.com");
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.access_token);
@@ -117,46 +116,12 @@ namespace StaticSiteQuickstart
             Console.Clear();
             Console.WriteLine("Please choose the subscription into which the resources will be deployed.");
 
-            // copied from: https://stackoverflow.com/a/39820564/24975
-            int selected = 0;
-            bool done = false;
+
+
             List<Subscription> activeSubscription = subscriptions.value.Where(x => x.state == "Enabled").ToList();
-            while (!done)
-            {
-
-                for (int i = 0; i < activeSubscription.Count; i++)
-                {
-                    if (selected == i)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write("> ");
-                    }
-                    else
-                    {
-                        Console.Write("  ");
-                    }
-                    Console.WriteLine($"{activeSubscription[i].displayName} ({activeSubscription[i].subscriptionId})");
-                    Console.ResetColor();
-                }
-
-                switch (Console.ReadKey(true).Key)
-                {
-                    case ConsoleKey.UpArrow:
-                        selected = Math.Max(0, selected - 1);
-                        break;
-                    case ConsoleKey.DownArrow:
-                        selected = Math.Min(activeSubscription.Count - 1, selected + 1);
-                        break;
-                    case ConsoleKey.Enter:
-                        done = true;
-                        break;
-                }
-
-                if (!done)
-                    Console.CursorTop = Console.CursorTop - activeSubscription.Count;
-            }
-            SiteConfiguration.SetDefaultSubscription(activeSubscription[selected]);
-            return activeSubscription[selected];
+            Subscription selectedSubscription = CliPicker.SelectFromList(activeSubscription, x => $"{x.displayName} ({x.subscriptionId})");
+            //SiteConfiguration.SetDefaultSubscription(selectedSubscription);
+            return selectedSubscription;
         }
 
         public static IWebHostBuilder CreateWebHostBuilder() =>
