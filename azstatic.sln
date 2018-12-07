@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28307.106
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StaticSiteQuickstart", "StaticSiteQuickstart\StaticSiteQuickstart.csproj", "{F3833315-AF89-4838-B49D-3731B8654E0F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "azstatic", "azstatic\azstatic.csproj", "{F3833315-AF89-4838-B49D-3731B8654E0F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
