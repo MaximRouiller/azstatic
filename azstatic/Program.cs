@@ -94,13 +94,31 @@ namespace azstatic
                     Console.WriteLine($"Existing storage account updated: {config.StorageAccount}");
                 }
 
-                // retrieve storage key (not to be saved)
+                // retrieve storage key and use it to enable static website
                 string storageKey = await GetAzureStorageKey(config, client);
                 await SetAzureStorageServiceProperties(storageKey, config);
 
-                // todo: write code that will be very nice and will actually do magnificient work.
+                // retrieve web endpoint
+                string url = await GetAzureStorageUriAsync(config, client);
+
+                Console.WriteLine("Website provisioned properly and accessible on: ");
+                Console.WriteLine($"\t{url}");
+                
                 Console.WriteLine("Static site deployed.");
             }
+        }
+
+        private static async Task<string> GetAzureStorageUriAsync(ConfigurationFile config, HttpClient client)
+        {
+            string subscriptionId = config.SubscriptionId;
+            string resourceGroupName = config.ResourceGroup;
+            string accountName = config.StorageAccount;
+
+            HttpResponseMessage result = await client.GetAsync($"/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}?api-version=2018-07-01");
+
+            string content = await result.Content.ReadAsStringAsync();
+            GetProperties properties = JsonConvert.DeserializeObject<GetProperties>(content);
+            return properties?.properties?.primaryEndpoints?.web;
         }
 
         private static async Task SetAzureStorageServiceProperties(string storageKey, ConfigurationFile config)
