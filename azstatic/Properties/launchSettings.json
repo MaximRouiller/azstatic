@@ -1,8 +1,16 @@
 {
   "profiles": {
-    "StaticSiteQuickstart": {
+    "azstatic - login": {
+      "commandName": "Project",
+      "commandLineArgs": "login"
+    },
+    "azstatic - init": {
       "commandName": "Project",
       "commandLineArgs": "init"
+    },
+    "azstatic - deploy": {
+      "commandName": "Project",
+      "commandLineArgs": "deploy"
     }
   }
 }
