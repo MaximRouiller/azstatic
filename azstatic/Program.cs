@@ -102,9 +102,7 @@ namespace azstatic
                 string url = await GetAzureStorageUriAsync(config, client);
 
                 Console.WriteLine("Website provisioned properly and accessible on: ");
-                Console.WriteLine($"\t{url}");
-                
-                Console.WriteLine("Static site deployed.");
+                Console.WriteLine($"\t{url}");                
             }
         }
 
