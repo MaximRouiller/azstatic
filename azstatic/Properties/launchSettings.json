@@ -10,7 +10,7 @@
     },
     "azstatic - deploy": {
       "commandName": "Project",
-      "commandLineArgs": "deploy"
+      "commandLineArgs": "deploy ./StaticSample/generated"
     }
   }
 }

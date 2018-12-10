@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Auth;
+using Microsoft.WindowsAzure.Storage.Blob;
 using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Newtonsoft.Json;
 using System;
@@ -29,6 +30,17 @@ namespace azstatic
         {
             if (args.Length == 0) { Console.WriteLine("Missing parameters"); return; }
 
+            HttpClient client = null;
+            if (File.Exists(".token"))
+            {
+                string rawToken = File.ReadAllText(".token");
+                Token token = JsonConvert.DeserializeObject<Token>(rawToken);
+
+                client = new HttpClient();
+                client.BaseAddress = new Uri("https://management.azure.com");
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.access_token);
+                client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("azstatic", "0.0.1"));
+            }
             string action = args[0];
             if (action == "login")
             {
@@ -41,14 +53,11 @@ namespace azstatic
 
             if (action == "init")
             {
-                string rawToken = File.ReadAllText(".token");
-                Token token = JsonConvert.DeserializeObject<Token>(rawToken);
-
-                HttpClient client = new HttpClient();
-                client.BaseAddress = new Uri("https://management.azure.com");
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.access_token);
-                client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("azstatic", "0.0.1"));
-
+                if (client == null)
+                {
+                    Console.WriteLine("Please use the `azstatic login` before initializing resources.");
+                    return;
+                }
 
                 // select subscription
                 ConfigurationFile config = AzureConfiguration.GetFromFile();
@@ -102,8 +111,64 @@ namespace azstatic
                 string url = await GetAzureStorageUriAsync(config, client);
 
                 Console.WriteLine("Website provisioned properly and accessible on: ");
-                Console.WriteLine($"\t{url}");                
+                Console.WriteLine($"\t{url}");
             }
+
+            if (action == "deploy")
+            {
+                string pathOfStaticSite = ".";
+                if (args.Length == 2)
+                {
+                    if (Directory.Exists(args[1]))
+                    {
+                        pathOfStaticSite = args[1];
+                    }
+                }
+                ConfigurationFile config = AzureConfiguration.GetFromFile();
+
+                // retrieve storage key to allow upload
+                string storageKey = await GetAzureStorageKey(config, client);
+                await UploadPathToAzureStorage(pathOfStaticSite, storageKey, config, client);
+            }
+        }
+
+        private static async Task UploadPathToAzureStorage(string pathOfStaticSite, string storageKey, ConfigurationFile config, HttpClient client)
+        {
+            string fullPath = Path.GetFullPath(pathOfStaticSite);
+            string[] filesToUpload = Directory.GetFiles(fullPath, "*", new EnumerationOptions { RecurseSubdirectories = true, ReturnSpecialDirectories = false, IgnoreInaccessible = true });
+
+            CloudStorageAccount storageAccount = new CloudStorageAccount(new StorageCredentials(config.StorageAccount, storageKey), true);
+            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
+            CloudBlobContainer container = blobClient.GetContainerReference("$web");
+            if (!await container.ExistsAsync())
+            {
+                Console.WriteLine("Could not find the static site `$web` container. Make sure your run `azstatic init` again.");
+                return;
+            }
+
+            List<Task> uploadTasks = new List<Task>();
+            foreach (string fileToUpload in filesToUpload)
+            {
+                string relativePath = fileToUpload.Replace(fullPath + "\\", string.Empty);
+                CloudBlockBlob blob = container.GetBlockBlobReference(relativePath);
+                blob.Properties.ContentType = DetectMimeTypeForFileExtension(Path.GetExtension(fileToUpload));
+                uploadTasks.Add(blob.UploadFromFileAsync(fileToUpload));
+            }
+
+            try
+            {
+                await Task.WhenAll(uploadTasks);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+
+        }
+
+        private static string DetectMimeTypeForFileExtension(string fileExtension)
+        {
+            return MimeTypeMap.List.MimeTypeMap.GetMimeType(fileExtension).FirstOrDefault();
         }
 
         private static async Task<string> GetAzureStorageUriAsync(ConfigurationFile config, HttpClient client)
@@ -122,7 +187,7 @@ namespace azstatic
         private static async Task SetAzureStorageServiceProperties(string storageKey, ConfigurationFile config)
         {
             CloudStorageAccount storageAccount = new CloudStorageAccount(new StorageCredentials(config.StorageAccount, storageKey), true);
-            var blobClient = storageAccount.CreateCloudBlobClient();
+            CloudBlobClient blobClient = storageAccount.CreateCloudBlobClient();
             ServiceProperties blobServiceProperties = new ServiceProperties();
             blobServiceProperties.StaticWebsite = new StaticWebsiteProperties
             {
@@ -148,7 +213,7 @@ namespace azstatic
 
         private static async Task CreateStorageAccountAsync(string storageAccountName, HttpClient client, ConfigurationFile config)
         {
-            string template = $"{{\"sku\": {{ \"name\": \"Standard_LRS\" }}, \"kind\": \"StorageV2\", \"location\": \"eastus\", \"properties\": {{ \"staticWebsite\": {{ \"enabled\": true}} }} }}";            
+            string template = $"{{\"sku\": {{ \"name\": \"Standard_LRS\" }}, \"kind\": \"StorageV2\", \"location\": \"eastus\", \"properties\": {{ \"staticWebsite\": {{ \"enabled\": true}} }} }}";
 
             HttpResponseMessage result = await client.PutAsync($"/subscriptions/{config.SubscriptionId}/resourcegroups/{config.ResourceGroup}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}?api-version=2018-02-01", new StringContent(template, Encoding.UTF8, "application/json"));
             string requestContent = await result.RequestMessage.Content.ReadAsStringAsync();

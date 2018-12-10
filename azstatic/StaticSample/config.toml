@@ -1,4 +1,4 @@
 baseURL = "http://staticsitetest.maximerouiller.com/"
 languageCode = "en-us"
-title = "My New Hugo Site"
+title = "azstatic Sample site"
 theme = "ananke"
