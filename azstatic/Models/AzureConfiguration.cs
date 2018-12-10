@@ -1,51 +1,53 @@
-﻿using Newtonsoft.Json;
-using azstatic.Models.subscriptions;
+﻿using azstatic.Models.subscriptions;
+using Newtonsoft.Json;
+using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace azstatic.Models
 {
     public static class AzureConfiguration
     {
-        public class Configuration
-        {
-            public string SubscriptionId { get; set; }
-            public string ResourceGroup { get; set; }
-            public string StorageAccount { get; set; }
-        }
+        private static readonly string filename = "azure.json";        
 
-        private static readonly string filename = "azure.json";
-        
-
-        public static Configuration GetFromFile()
+        public static ConfigurationFile GetFromFile()
         {
             if (File.Exists(filename))
             {
                 // read file into a string and deserialize JSON to a type
-                return JsonConvert.DeserializeObject<Configuration>(File.ReadAllText(filename));
+                return JsonConvert.DeserializeObject<ConfigurationFile>(File.ReadAllText(filename));
             }
-            return new Configuration();
+            return new ConfigurationFile();
         }
 
-        public static void SaveToFile(Configuration configuration)
+        public static async Task SaveToFile(ConfigurationFile configuration)
         {
             using (FileStream fs = File.OpenWrite(filename))
             using (StreamWriter sw = new StreamWriter(fs))
             {
-                sw.Write(JsonConvert.SerializeObject(configuration));
+                await sw.WriteAsync(JsonConvert.SerializeObject(configuration));
             }
         }
-        public static void SetDefaultSubscription(Subscription defaultSubscription)
+        public static async Task SetDefaultSubscriptionAsync(Subscription defaultSubscription)
         {
-            Configuration configuration = GetFromFile();
+            ConfigurationFile configuration = GetFromFile();
             configuration.SubscriptionId = defaultSubscription.subscriptionId;
-            SaveToFile(configuration);
+            await SaveToFile(configuration);
         }
 
-        public static void SetDefaultResourceGroup(string rgName)
+        public static async Task SetDefaultResourceGroupAsync(string rgName)
         {
-            Configuration configuration = GetFromFile();
+            ConfigurationFile configuration = GetFromFile();
             configuration.ResourceGroup = rgName;
-            SaveToFile(configuration);
+            await SaveToFile(configuration);
+        }
+
+        public static async Task SetDefaultStorageAccountAsync(string storageAccountName)
+        {
+
+            ConfigurationFile configuration = GetFromFile();
+            configuration.StorageAccount = storageAccountName;
+            await SaveToFile(configuration);
         }
     }
 }

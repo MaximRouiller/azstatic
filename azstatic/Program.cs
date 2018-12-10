@@ -1,10 +1,14 @@
 ﻿using azstatic.ConsoleComponents;
+using azstatic.Models;
+using azstatic.Models.storage;
+using azstatic.Models.subscriptions;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Auth;
+using Microsoft.WindowsAzure.Storage.Shared.Protocol;
 using Newtonsoft.Json;
-using azstatic.Models;
-using azstatic.Models.subscriptions;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,7 +19,6 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using static azstatic.Models.AzureConfiguration;
 
 namespace azstatic
 {
@@ -48,13 +51,17 @@ namespace azstatic
 
 
                 // select subscription
-                Configuration config = AzureConfiguration.GetFromFile();
+                ConfigurationFile config = AzureConfiguration.GetFromFile();
                 if (string.IsNullOrWhiteSpace(config.SubscriptionId))
                 {
                     Subscription subscription = await SelectSubcriptionAsync(client);
 
                     Console.Clear();
                     Console.WriteLine($"The selected subscription is: {subscription.displayName}");
+                }
+                else
+                {
+                    Console.WriteLine($"Existing subscription found: {config.SubscriptionId}");
                 }
 
                 // select resource group
@@ -65,41 +72,91 @@ namespace azstatic
                     string rgName = $"azstatic-{RandomString(10)}-prod-rg";
 
                     await CreateResourceGroupAsync(rgName, client, config);
+                    Console.WriteLine($"Resource group {rgName} created.");
+                }
+                else
+                {
+                    await CreateResourceGroupAsync(config.ResourceGroup, client, config);
+                    Console.WriteLine($"Existing resource group updated: {config.ResourceGroup}");
                 }
 
                 // select storage account name
                 config = AzureConfiguration.GetFromFile();
                 if (string.IsNullOrWhiteSpace(config.StorageAccount))
                 {
-
+                    string storageAccountName = $"azstatic{RandomString(10)}";
+                    await CreateStorageAccountAsync(storageAccountName, client, config);
+                    Console.WriteLine($"Resource group {storageAccountName} created.");
                 }
+                else
+                {
+                    await CreateStorageAccountAsync(config.StorageAccount, client, config);
+                    Console.WriteLine($"Existing storage account updated: {config.StorageAccount}");
+                }
+
+                // retrieve storage key (not to be saved)
+                string storageKey = await GetAzureStorageKey(config, client);
+                await SetAzureStorageServiceProperties(storageKey, config);
 
                 // todo: write code that will be very nice and will actually do magnificient work.
                 Console.WriteLine("Static site deployed.");
             }
         }
 
-        private static async Task CreateResourceGroupAsync(string rgName, HttpClient client, Configuration config)
+        private static async Task SetAzureStorageServiceProperties(string storageKey, ConfigurationFile config)
         {
-            //var rgDefinition = new { location = "eastus" };
-            string rawJson = "{\"location\": \"eastus\"}";
+            CloudStorageAccount storageAccount = new CloudStorageAccount(new StorageCredentials(config.StorageAccount, storageKey), true);
+            var blobClient = storageAccount.CreateCloudBlobClient();
+            ServiceProperties blobServiceProperties = new ServiceProperties();
+            blobServiceProperties.StaticWebsite = new StaticWebsiteProperties
+            {
+                Enabled = true,
+                IndexDocument = "index.html",
+                ErrorDocument404Path = "404.html"
+            };
+            await blobClient.SetServicePropertiesAsync(blobServiceProperties);
+        }
 
-            //HttpResponseMessage result = await client.PutAsJsonAsync($"/subscriptions/{config.SubscriptionId}/resourcegroups/{rgName}?api-version=2018-05-01", rgDefinition);
-            //var formatter = new JsonMediaTypeFormatter();
+        private static async Task<string> GetAzureStorageKey(ConfigurationFile config, HttpClient client)
+        {
+            string subscriptionId = config.SubscriptionId;
+            string resourceGroupName = config.ResourceGroup;
+            string accountName = config.StorageAccount;
 
-            //formatter.SerializerSettings.Formatting = Formatting.Indented;
+            HttpResponseMessage result = await client.PostAsync($"/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}/listKeys?api-version=2018-07-01", null);
 
-            //HttpResponseMessage result = await client.PutAsync($"/subscriptions/{config.SubscriptionId}/resourcegroups/{rgName}?api-version=2018-05-01", 
-            //    new ObjectContent(rgDefinition.GetType(), rgDefinition, formatter));
+            string content = await result.Content.ReadAsStringAsync();
+            StorageKeysCollection keyCollection = JsonConvert.DeserializeObject<StorageKeysCollection>(content);
+            return keyCollection.Keys.First().Value;
+        }
 
-            HttpResponseMessage result = await client.PutAsync($"/subscriptions/{config.SubscriptionId}/resourcegroups/{rgName}?api-version=2018-05-01", new StringContent(rawJson, Encoding.UTF8, "application/json"));
+        private static async Task CreateStorageAccountAsync(string storageAccountName, HttpClient client, ConfigurationFile config)
+        {
+            string template = $"{{\"sku\": {{ \"name\": \"Standard_LRS\" }}, \"kind\": \"StorageV2\", \"location\": \"eastus\", \"properties\": {{ \"staticWebsite\": {{ \"enabled\": true}} }} }}";            
+
+            HttpResponseMessage result = await client.PutAsync($"/subscriptions/{config.SubscriptionId}/resourcegroups/{config.ResourceGroup}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}?api-version=2018-02-01", new StringContent(template, Encoding.UTF8, "application/json"));
+            string requestContent = await result.RequestMessage.Content.ReadAsStringAsync();
+            HttpRequestMessage request = result.RequestMessage;
+            string content = await result.Content.ReadAsStringAsync();
+            if (result.IsSuccessStatusCode)
+            {
+                await AzureConfiguration.SetDefaultStorageAccountAsync(storageAccountName);
+            }
+        }
+
+        private static async Task CreateResourceGroupAsync(string rgName, HttpClient client, ConfigurationFile config)
+        {
+            string defaultLocation = "eastus";
+            string template = $"{{\"location\": \"{defaultLocation}\"}}";
+
+            HttpResponseMessage result = await client.PutAsync($"/subscriptions/{config.SubscriptionId}/resourcegroups/{rgName}?api-version=2018-05-01", new StringContent(template, Encoding.UTF8, "application/json"));
 
             string requestContent = await result.RequestMessage.Content.ReadAsStringAsync();
             HttpRequestMessage request = result.RequestMessage;
             string content = await result.Content.ReadAsStringAsync();
             if (result.IsSuccessStatusCode)
             {
-                //SiteConfiguration.SetDefaultResourceGroup(rgName);
+                await AzureConfiguration.SetDefaultResourceGroupAsync(rgName);
             }
         }
 
@@ -122,7 +179,7 @@ namespace azstatic
 
             List<Subscription> activeSubscription = subscriptions.value.Where(x => x.state == "Enabled").ToList();
             Subscription selectedSubscription = CliPicker.SelectFromList(activeSubscription, x => $"{x.displayName} ({x.subscriptionId})");
-            AzureConfiguration.SetDefaultSubscription(selectedSubscription);
+            await AzureConfiguration.SetDefaultSubscriptionAsync(selectedSubscription);
             return selectedSubscription;
         }
 
