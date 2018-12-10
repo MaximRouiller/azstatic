@@ -1,4 +1,4 @@
-﻿namespace StaticSiteQuickstart.Models.subscriptions
+﻿namespace azstatic.Models.subscriptions
 {
     public class Subscription
     {

@@ -3,8 +3,8 @@ using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using StaticSiteQuickstart.Models;
-using StaticSiteQuickstart.Models.subscriptions;
+using azstatic.Models;
+using azstatic.Models.subscriptions;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,9 +15,9 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
-using static StaticSiteQuickstart.Models.AzureConfiguration;
+using static azstatic.Models.AzureConfiguration;
 
-namespace StaticSiteQuickstart
+namespace azstatic
 {
     class Program
     {
@@ -29,11 +29,11 @@ namespace StaticSiteQuickstart
             string action = args[0];
             if (action == "login")
             {
-                Console.WriteLine("Web server started...");
+                Console.WriteLine("We have opened a browser window for you to login. As soon as the authentication is completed, you can close your browser window.");
                 OpenBrowser($"http://login.microsoftonline.com/common/oauth2/authorize?response_type=code&client_id={Common.ClientId}&redirect_uri={WebUtility.UrlEncode(Common.ReplyUrl)}&state=code&resource=https%3a%2f%2fmanagement.azure.com%2f&prompt=select_account");
                 // start kestrel and ... somehow... retrieve/save the authentication flow? 🤷‍♂️
                 CreateWebHostBuilder().Build().Run();
-                Console.WriteLine("Web server stopped.");
+                Console.WriteLine("Authentication completed.");
             }
 
             if (action == "init")
@@ -128,6 +128,7 @@ namespace StaticSiteQuickstart
 
         public static IWebHostBuilder CreateWebHostBuilder() =>
             WebHost.CreateDefaultBuilder()
+                .SuppressStatusMessages(true)
                 .ConfigureLogging((context, logging) =>
                 {
                     logging.ClearProviders();

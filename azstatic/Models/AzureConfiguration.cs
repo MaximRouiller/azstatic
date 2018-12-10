@@ -1,9 +1,8 @@
 ﻿using Newtonsoft.Json;
-using StaticSiteQuickstart.Models.subscriptions;
-using System;
+using azstatic.Models.subscriptions;
 using System.IO;
 
-namespace StaticSiteQuickstart.Models
+namespace azstatic.Models
 {
     public static class AzureConfiguration
     {

@@ -1,4 +1,4 @@
-﻿namespace StaticSiteQuickstart.Models
+﻿namespace azstatic.Models
 {
     class Token
     {

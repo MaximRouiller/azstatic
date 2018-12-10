@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
-namespace StaticSiteQuickstart.Models.subscriptions
+namespace azstatic.Models.subscriptions
 {
 
     public class Subscriptions
