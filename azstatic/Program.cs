@@ -95,7 +95,7 @@ namespace azstatic
                 {
                     string storageAccountName = $"azstatic{RandomString(10)}";
                     await CreateStorageAccountAsync(storageAccountName, client, config);
-                    Console.WriteLine($"Resource group {storageAccountName} created.");
+                    Console.WriteLine($"Storage account {storageAccountName} created.");
                 }
                 else
                 {
@@ -108,10 +108,25 @@ namespace azstatic
                 await SetAzureStorageServiceProperties(storageKey, config);
 
                 // retrieve web endpoint
-                string url = await GetAzureStorageUriAsync(config, client);
+                string storageUrl = await GetAzureStorageUriAsync(config, client);
+
+                config = AzureConfiguration.GetFromFile();
+                if (string.IsNullOrWhiteSpace(config.AzureCDNName))
+                {
+                    string cdnName = config.StorageAccount;
+                    await CreateAzureCDNProfile(cdnName, client, config);
+                    await CreateAzureCDNEndpoint(cdnName, storageUrl, client, config);
+                    Console.WriteLine($"Azure CDN endpoint {cdnName} created.");
+                }
+                else
+                {
+                    await CreateAzureCDNProfile(config.AzureCDNName, client, config);
+                    await CreateAzureCDNEndpoint(config.AzureCDNName, storageUrl, client, config);
+                    Console.WriteLine($"Existing storage account updated: {config.StorageAccount}");
+                }
 
                 Console.WriteLine("Website provisioned properly and accessible on: ");
-                Console.WriteLine($"\t{url}");
+                Console.WriteLine($"\t{storageUrl}");
             }
 
             if (action == "deploy")
@@ -129,6 +144,38 @@ namespace azstatic
                 // retrieve storage key to allow upload
                 string storageKey = await GetAzureStorageKey(config, client);
                 await UploadPathToAzureStorage(pathOfStaticSite, storageKey, config, client);
+            }
+        }
+
+        private static async Task CreateAzureCDNProfile(string azureCDNName, HttpClient client, ConfigurationFile config)
+        {
+            string template = "{\"location\": \"WestCentralUs\",\"sku\": {\"name\":\"Standard_Verizon\"}}";
+
+            HttpResponseMessage result = await client.PutAsync($"/subscriptions/{config.SubscriptionId}/resourcegroups/{config.ResourceGroup}/providers/Microsoft.Cdn/profiles/{azureCDNName}/?api-version=2017-10-12", new StringContent(template, Encoding.UTF8, "application/json"));
+
+            string requestContent = await result.RequestMessage.Content.ReadAsStringAsync();
+            HttpRequestMessage request = result.RequestMessage;
+            string content = await result.Content.ReadAsStringAsync();
+            if (result.IsSuccessStatusCode)
+            {
+                //await AzureConfiguration.SetDefaultCDNNameAsync(azureCDNName);
+            }
+        }
+
+        private static async Task CreateAzureCDNEndpoint(string azureCDNName, string storageUrl, HttpClient client, ConfigurationFile config)
+        {
+
+            string validHostName = new Uri(storageUrl).DnsSafeHost;
+            string template = $"{{ \"location\": \"WestCentralUs\", \"properties\": {{ \"origins\": [{{\"name\": \"{azureCDNName}-origin\",\"properties\": {{\"hostName\": \"{validHostName}\",\"httpPort\": 80,\"httpsPort\": 443}}}}]}}}}";
+
+            HttpResponseMessage result = await client.PutAsync($"/subscriptions/{config.SubscriptionId}/resourcegroups/{config.ResourceGroup}/providers/Microsoft.Cdn/profiles/{azureCDNName}/endpoints/{azureCDNName}?api-version=2017-10-12", new StringContent(template, Encoding.UTF8, "application/json"));
+
+            string requestContent = await result.RequestMessage.Content.ReadAsStringAsync();
+            HttpRequestMessage request = result.RequestMessage;
+            string content = await result.Content.ReadAsStringAsync();
+            if (result.IsSuccessStatusCode)
+            {
+                //await AzureConfiguration.SetDefaultCDNNameAsync(azureCDNName);
             }
         }
 
